@@ -4,12 +4,41 @@
 
 
 -module(net).
--export([gen_rand_net/1
+-export([gen_rand_net/1, setup/4
 		]).
 
 -define(PORTS_NBR,4).
 -define(MAX_RAND_ATTEMPTS,5).
 
+
+
+setup(N,Lat,Traff,Msg_len) ->
+	G = gen_rand_net(N),
+	Bs = lists:foldl(fun(B,Acc) -> [ {B, spawn(box,new,[B,dict:fetch(B,G),Lat,Traff]) } |Acc] 
+					end,[],dict:fetch_keys(G)),
+
+	lists:foreach(  fun({B,Pid}) -> 
+						Links = dict:fetch(B,G),
+						Neibs = [ begin 
+									{B2,B2_pid} = lists:keyfind(B2,1,Bs),
+									{P1,P2,B2,B2_pid} 
+								  end || {P1,P2,B2} <- Links ],
+						Pid ! {neibs, Neibs} 
+					end, Bs),
+	
+	%% compute shortest path between the first and the second boxes
+
+	%% simalate message passing between box1 and box2 via the shortest path
+
+
+	%% compute the routes from each box to box2
+
+	%% simulate message passing between box1 and box using ibtp protocol
+
+
+	%% shutdown 
+	lists:foreach(  fun({_B,Pid}) -> Pid ! quit
+					end,Bs).
 
 
 
@@ -20,7 +49,7 @@ gen_rand_net(N) ->
 	io:format("Generating ~w wires~n",[M]),
 
 	Boxes = lists:foldl(fun(_,Acc)-> 
-				[K|_] = MACs = [ port:get_mac() || _ <- lists:seq(1,?PORTS_NBR) ],
+				[K|_] = MACs = [ get_mac() || _ <- lists:seq(1,?PORTS_NBR) ],
 				[{K,MACs}|Acc]
 						end,[],lists:seq(1,N)),
 
@@ -67,4 +96,7 @@ get_random_wire(Boxes,K) ->
 			end
 	end.
 
+
+
+get_mac() -> crypto:strong_rand_bytes(6).
 
