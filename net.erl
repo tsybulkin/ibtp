@@ -14,14 +14,14 @@
 
 setup(N,Lat,Traff,Msg_len) ->
 	G = gen_rand_net(N),
-	Bs = lists:foldl(fun(B,Acc) -> [ {B, spawn(box,new,[B,dict:fetch(B,G),Lat,Traff]) } |Acc] 
+	Bs = lists:foldl(fun(B,Acc) -> [ {B, spawn(box,new,[B,Lat,Traff]) } |Acc] 
 					end,[],dict:fetch_keys(G)),
 
 	lists:foreach(  fun({B,Pid}) -> 
 						Links = dict:fetch(B,G),
 						Neibs = [ begin 
 									{B2,B2_pid} = lists:keyfind(B2,1,Bs),
-									{P1,P2,B2,B2_pid} 
+									{P1,P2,B2_pid} 
 								  end || {P1,P2,B2} <- Links ],
 						Pid ! {neibs, Neibs} 
 					end, Bs),
