@@ -4,7 +4,7 @@
 
 
 -module(netw).
--export([gen_rand_net/1, setup/4
+-export([gen_rand_net/1, setup/3
 		]).
 
 -define(PORTS_NBR,4).
@@ -13,17 +13,19 @@
 
 
 
-setup(N,Lat,Traff,Msg_len) ->
+setup(N,Traff,Msg_len) ->
+	random:seed(),
 	G = gen_rand_net(N),
-	Bs = lists:foldl(fun(B,Acc) -> [ {B, spawn(box,new,[B,Lat,Traff]) } |Acc] 
+	Bs = lists:foldl(fun(B,Acc) -> [ {B, spawn(box,new,[B,Traff]) } |Acc] 
 					end,[],dict:fetch_keys(G)),
-
+	io:format("Bs: ~p~n",[Bs]),
 	lists:foreach(  fun({B,Pid}) -> 
 						Links = dict:fetch(B,G),
-						Neibs = [ begin 
-									{B2,B2_pid} = lists:keyfind(B2,1,Bs),
-									{P1,P2,B2_pid} 
-								  end || {P1,P2,B2} <- Links ],
+						io:format("Links:~n~p~n",[Links]),
+						Neibs = [ begin
+									{B2,Bid}=lists:keyfind(B2,1,Bs),
+									{B2,P,Lat,Bid}
+								  end || {B2,P,Lat} <- Links ],
 						Pid ! {neibs, Neibs} 
 					end, Bs),
 	
@@ -64,8 +66,10 @@ wire_boxes(_,0,Net) -> Net;
 wire_boxes(N,M,Net) ->
 	case get_random_wire(N,Net,0) of
 		{Box1,Box2} ->
+			P1 = 1 + length(dict:fetch(Box1,Net)),
+			P2 = 1 + length(dict:fetch(Box2,Net)),
 			Lat = get_rand_latency(),
-			Net1 = dict:append(Box1,{Box2,Lat},dict:append(Box2,{Box1,Lat},Net)),
+			Net1 = dict:append(Box1,{Box2,P1,Lat},dict:append(Box2,{Box1,P2,Lat},Net)),
 			wire_boxes(N,M-1,Net1);
 		false ->
 			io:format("~p wires could not be used~n",[M]),
@@ -78,14 +82,17 @@ get_random_wire(_,_,?MAX_RAND_ATTEMPTS) -> false;
 get_random_wire(N,Net,Attempt) ->
 	B1 = get_box(random:uniform(N)),
 	B2 = get_box(random:uniform(N)),
-	case length(dict:fetch(B1,Net))<?PORTS_NBR andalso length(dict:fetch(B2,Net))<?PORTS_NBR of
-		false -> get_random_wire(N,Net,Attempt+1);
-		true -> {B1,B2}
+	case length(dict:fetch(B1,Net))>=?PORTS_NBR orelse length(dict:fetch(B2,Net))>=?PORTS_NBR of
+		true -> get_random_wire(N,Net,Attempt+1);
+		false -> case B1=:=B2 of
+					true -> get_random_wire(N,Net,Attempt+1);
+					false ->{B1,B2}
+				end
 	end.
 
 
 
-get_rand_latency() -> random:uniform(?MAX_LATENCY).
+get_rand_latency() -> random:uniform(?MAX_LATENCY div 2) + (?MAX_LATENCY div 2).
 
 
 
